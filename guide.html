@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FPV Car Build Guide</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  :root { --ink:#16202b; --soft:#56636f; --line:#d5dbe1; --accent:#0b7a75; --warm:#c8501e; --tint:#eef6f5; --warn:#fdf1ea; }
+  * { box-sizing: border-box; }
+  body { font: 10.5pt/1.5 "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); margin: 0; }
+  h1 { font-size: 30pt; line-height: 1.05; margin: 0 0 6pt; letter-spacing: -0.5pt; }
+  h2 { font-size: 14pt; margin: 20pt 0 6pt; padding-bottom: 4pt; border-bottom: 2pt solid var(--accent); break-after: avoid; }
+  h2 span { color: var(--accent); margin-right: 6pt; }
+  h3 { font-size: 11pt; margin: 12pt 0 3pt; break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  ul, ol { margin: 0 0 6pt; padding-left: 16pt; }
+  li { margin-bottom: 2.5pt; }
+  .lead { font-size: 12pt; color: var(--soft); max-width: 150mm; }
+  .meta { color: var(--soft); font-size: 9pt; margin-top: 8pt; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9.5pt; }
+  tr { break-inside: avoid; }
+  th { text-align: left; background: var(--ink); color: #fff; padding: 5pt 7pt; font-weight: 600; }
+  td { padding: 5pt 7pt; border-bottom: 0.75pt solid var(--line); vertical-align: top; }
+  .box { border-left: 3pt solid var(--accent); background: var(--tint); padding: 7pt 10pt; margin: 8pt 0; break-inside: avoid; }
+  .box.warn { border-color: var(--warm); background: var(--warn); }
+  .box b:first-child { display: block; margin-bottom: 2pt; }
+  .day { display: grid; grid-template-columns: 30mm 1fr; gap: 0 8pt; padding: 7pt 0; border-bottom: 0.75pt solid var(--line); break-inside: avoid; }
+  .day .when { font-weight: 700; color: var(--accent); }
+  .day .when small { display: block; font-weight: 400; color: var(--soft); }
+  .day ul { margin: 0; }
+  code { font: 9.5pt Menlo, monospace; background: #f1f3f5; padding: 0 3pt; border-radius: 2pt; }
+  figure { margin: 8pt 0; break-inside: avoid; }
+  figcaption { font-size: 9pt; color: var(--soft); margin-top: 3pt; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  .pagebreak { break-before: page; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 700; padding: 0 5pt; border-radius: 8pt; background: var(--tint); color: var(--accent); white-space: nowrap; }
+  .tag.buy { background: var(--warn); color: var(--warm); }
+</style>
+</head>
+<body>
+
+<h1>FPV Car<br>Build Guide</h1>
+<p class="lead">A small car you drive from your phone while watching live video from a camera on the car. No app needed, it runs in the phone's browser.</p>
+<p class="meta">Made for Pranav · 10 October 2026 · Version 2 (power bank only)</p>
+
+<div class="box warn">
+<b>Read this first</b>
+The part names in this guide were read from the small pictures in the Amazon order list, not from the product pages. When each part arrives, check its label against the table in section 2. If the motor driver is not a TB6612FNG, the wiring in section 4 changes.
+</div>
+
+<h2><span>1</span>How it works</h2>
+<ol>
+  <li>The <b>ESP32-CAM</b> board makes its own Wi-Fi hotspot.</li>
+  <li>Your phone joins that hotspot and opens a web page stored on the board.</li>
+  <li>The page shows the camera video and has drive buttons (forward, back, left, right, stop).</li>
+  <li>When you press a button, the ESP32-CAM tells the <b>motor driver</b> which way to spin the wheels.</li>
+  <li>The motor driver feeds power-bank power to the motors. The ESP32-CAM cannot do this itself because its pins are far too weak to run a motor.</li>
+</ol>
+
+<h2><span>2</span>Parts</h2>
+<table>
+  <tr><th style="width:36%">Part</th><th style="width:22%">Arrives</th><th>Job in the car</th></tr>
+  <tr><td>ESP32 dev board</td><td>Sat 10 Oct (today)</td><td>Practice board now. Can also flash the ESP32-CAM before the programmer arrives (section 6).</td></tr>
+  <tr><td>Multimeter</td><td>Sat 10 Oct (today)</td><td>Check voltages and find wiring mistakes before they burn something.</td></tr>
+  <tr><td>Car chassis kit (yellow TT motors, wheels, AA holder)</td><td>Sun 11 Oct</td><td>Body, motors and wheels.</td></tr>
+  <tr><td>Small power bank</td><td>Sun 11 Oct</td><td>5 V power for the whole car: the ESP32-CAM and the motors.</td></tr>
+  <tr><td>ESP32-CAM with camera</td><td>Fri 16 Oct</td><td>Brain of the car: Wi-Fi, video and drive commands.</td></tr>
+  <tr><td>ESP32-CAM programmer base (small black USB board)</td><td>Sun 18 Oct</td><td>Easy way to load code into the ESP32-CAM.</td></tr>
+  <tr><td>Motor driver, TB6612FNG (small red board)</td><td>Tue 20 Oct</td><td>Switches power to the motors.</td></tr>
+  <tr><td>Capacitor, 470 to 1000 µF, rated 10 V or higher <span class="tag buy">buy locally</span></td><td>Any day</td><td>Stops the camera restarting when the motors start. Costs a few rupees.</td></tr>
+  <tr><td>Soldering iron, solder, jumper wires <span class="tag">you have</span></td><td>—</td><td>Joining everything.</td></tr>
+</table>
+<p>Also useful if you have them lying around: double-sided tape or zip ties to hold the boards, and an old USB cable you can cut (see section 3). The AA holder that comes with the chassis kit is not used in this version.</p>
+
+<h2><span>3</span>Power plan</h2>
+<p>The <b>power bank runs the whole car</b>. Its 5 V goes to two places: the ESP32-CAM and the motor driver. No AA cells are needed.</p>
+<ul>
+  <li><b>Check the output rating</b> printed on the power bank. It should say 5 V at 2 A or more.</li>
+  <li><b>Speed:</b> the motors get 5 V, so the car is a little slower than it would be on 6 V. Still fine for a light car.</li>
+  <li><b>Switching off:</b> unplug the power bank.</li>
+</ul>
+<div class="box">
+<b>Fit the capacitor</b>
+When the motors start or change direction they pull a burst of current, and the 5 V dips for a moment. That dip can freeze the video or restart the ESP32-CAM. A capacitor soldered across the ESP32-CAM's <code>5V</code> and <code>GND</code> pins works like a tiny reserve tank and covers the dip. The leg next to the stripe is minus and goes to <code>GND</code>. Fitted backwards, it can pop.
+</div>
+<h3>Getting 5 V out of the power bank</h3>
+<p>Neither the ESP32-CAM nor the motor driver has a USB port. Cut an old USB cable that fits the power bank, and find the red (+5 V) and black (GND) wires inside. Check with the multimeter that red really is +5 V. Those two wires feed the whole car.</p>
+<p>Your power bank looked like the kind with a built-in cable. If it has no ordinary USB socket, you will need a small adapter or socket that its plug fits into. Check this the day it arrives.</p>
+<h3>If the video still freezes when you drive</h3>
+<p>Then the motors need their own battery. Move the driver's <code>VM</code> wire from the power bank to the plus of a 4 × AA alkaline pack (regular Duracell is fine), and join the pack's minus to <code>GND</code>. Everything else stays the same.</p>
+
+<h2 class="pagebreak"><span>4</span>Wiring</h2>
+<figure>
+<svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .b { fill:#fff; stroke:#16202b; stroke-width:1.6; }
+      .t { font-size:13px; font-weight:700; fill:#16202b; }
+      .p { font-size:10.5px; fill:#16202b; }
+      .n { font-size:10px; fill:#56636f; }
+      .red { stroke:#d23a2a; } .blk { stroke:#16202b; } .sig { stroke:#0b7a75; } .org { stroke:#e08a1e; } .mot { stroke:#5a56c8; }
+      .w { fill:none; stroke-width:2.2; }
+    </style>
+  </defs>
+
+  <!-- power bank -->
+  <rect class="b" x="14" y="50" width="100" height="240" rx="8"/>
+  <text class="t" x="64" y="160" text-anchor="middle">Power</text>
+  <text class="t" x="64" y="177" text-anchor="middle">bank</text>
+  <text class="p" x="108" y="74" text-anchor="end">5V</text>
+  <text class="p" x="108" y="264" text-anchor="end">GND</text>
+
+  <!-- esp32-cam -->
+  <rect class="b" x="230" y="50" width="130" height="240" rx="8"/>
+  <text class="t" x="282" y="282" text-anchor="middle">ESP32-CAM</text>
+  <text class="p" x="236" y="74">5V</text>
+  <text class="p" x="236" y="264">GND</text>
+  <text class="p" x="354" y="74" text-anchor="end">3V3</text>
+  <text class="p" x="354" y="124" text-anchor="end">IO14</text>
+  <text class="p" x="354" y="154" text-anchor="end">IO15</text>
+  <text class="p" x="354" y="184" text-anchor="end">IO13</text>
+  <text class="p" x="354" y="214" text-anchor="end">IO12</text>
+  <text class="p" x="354" y="264" text-anchor="end">GND</text>
+
+  <!-- tb6612 -->
+  <rect class="b" x="470" y="50" width="150" height="240" rx="8"/>
+  <text class="t" x="552" y="282" text-anchor="middle">TB6612FNG driver</text>
+  <text class="p" x="476" y="68">VCC, STBY,</text>
+  <text class="p" x="476" y="81">PWMA, PWMB</text>
+  <text class="p" x="476" y="124">AIN1</text>
+  <text class="p" x="476" y="154">AIN2</text>
+  <text class="p" x="476" y="184">BIN1</text>
+  <text class="p" x="476" y="214">BIN2</text>
+  <text class="p" x="476" y="264">GND</text>
+  <text class="p" x="590" y="66" text-anchor="middle">VM</text>
+  <text class="p" x="614" y="109" text-anchor="end">AO1</text>
+  <text class="p" x="614" y="139" text-anchor="end">AO2</text>
+  <text class="p" x="614" y="199" text-anchor="end">BO1</text>
+  <text class="p" x="614" y="229" text-anchor="end">BO2</text>
+
+  <!-- motors -->
+  <rect class="b" x="668" y="92" width="80" height="56" rx="8"/>
+  <text class="p" x="708" y="117" text-anchor="middle" font-weight="700">Left</text>
+  <text class="p" x="708" y="131" text-anchor="middle">motor(s)</text>
+  <rect class="b" x="668" y="182" width="80" height="56" rx="8"/>
+  <text class="p" x="708" y="207" text-anchor="middle" font-weight="700">Right</text>
+  <text class="p" x="708" y="221" text-anchor="middle">motor(s)</text>
+
+  <!-- wires -->
+  <path class="w red" d="M114 70 H230"/>
+  <path class="w red" d="M140 70 V16 H590 V50"/>
+  <path class="w blk" d="M114 260 H230"/>
+  <path class="w org" d="M360 70 H470"/>
+  <path class="w sig" d="M360 120 H470"/>
+  <path class="w sig" d="M360 150 H470"/>
+  <path class="w sig" d="M360 180 H470"/>
+  <path class="w sig" d="M360 210 H470"/>
+  <path class="w blk" d="M360 260 H470"/>
+  <path class="w mot" d="M620 105 H668"/>
+  <path class="w mot" d="M620 135 H668"/>
+  <path class="w mot" d="M620 195 H668"/>
+  <path class="w mot" d="M620 225 H668"/>
+  <circle cx="140" cy="70" r="3.5" fill="#d23a2a"/>
+
+  <!-- capacitor across 5V and GND -->
+  <path class="w red" d="M205 70 V160"/>
+  <path class="w blk" d="M205 170 V260"/>
+  <path d="M191 160 H219" stroke="#16202b" stroke-width="2.6"/>
+  <path d="M191 170 H219" stroke="#16202b" stroke-width="2.6"/>
+  <circle cx="205" cy="70" r="3.5" fill="#d23a2a"/>
+  <circle cx="205" cy="260" r="3.5" fill="#16202b"/>
+  <text class="p" x="186" y="156" text-anchor="end">+</text>
+  <text class="n" x="184" y="186" text-anchor="end">capacitor</text>
+  <text class="n" x="184" y="199" text-anchor="end">470–1000 µF</text>
+
+  <!-- wire notes -->
+  <text class="n" x="365" y="11" text-anchor="middle">5 V to the motor driver</text>
+  <text class="n" x="415" y="62" text-anchor="middle">3.3 V</text>
+  <text class="n" x="415" y="112" text-anchor="middle">signals</text>
+  <text class="n" x="415" y="252" text-anchor="middle">ground</text>
+</svg>
+<figcaption>Red = power, black = ground, orange = 3.3 V, green = control signals, purple = motor wires.</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:34%">From</th><th style="width:34%">To</th><th>Note</th></tr>
+  <tr><td>ESP32-CAM <code>IO14</code></td><td>Driver <code>AIN1</code></td><td rowspan="2">Left side direction</td></tr>
+  <tr><td>ESP32-CAM <code>IO15</code></td><td>Driver <code>AIN2</code></td></tr>
+  <tr><td>ESP32-CAM <code>IO13</code></td><td>Driver <code>BIN1</code></td><td rowspan="2">Right side direction</td></tr>
+  <tr><td>ESP32-CAM <code>IO12</code></td><td>Driver <code>BIN2</code></td></tr>
+  <tr><td>ESP32-CAM <code>3V3</code></td><td>Driver <code>VCC</code>, <code>STBY</code>, <code>PWMA</code>, <code>PWMB</code></td><td>All four driver pins go to 3.3 V. This switches the driver on.</td></tr>
+  <tr><td>ESP32-CAM <code>GND</code></td><td>Driver <code>GND</code></td><td>Ground</td></tr>
+    <tr><td>Driver <code>AO1</code>, <code>AO2</code></td><td>Left motor, two wires</td><td rowspan="2">If a wheel spins the wrong way, swap its two wires.</td></tr>
+  <tr><td>Driver <code>BO1</code>, <code>BO2</code></td><td>Right motor, two wires</td></tr>
+  <tr><td>Power bank +5 V</td><td>ESP32-CAM <code>5V</code> <b>and</b> driver <code>VM</code></td><td>One 5 V wire, split to both.</td></tr>
+  <tr><td>Power bank GND</td><td>ESP32-CAM <code>GND</code></td><td>The driver gets its ground through the ESP32-CAM.</td></tr>
+  <tr><td>Capacitor plus leg</td><td>ESP32-CAM <code>5V</code></td><td rowspan="2">Solder it as close to the board as you can.</td></tr>
+  <tr><td>Capacitor minus leg (stripe)</td><td>ESP32-CAM <code>GND</code></td></tr>
+</table>
+
+<div class="box">
+<b>If your kit has four motors</b>
+Join the two left motors together (in parallel) on <code>AO1</code>/<code>AO2</code> and the two right motors on <code>BO1</code>/<code>BO2</code>. The driver handles about 1.2 A per side continuously, so do not hold the wheels still by hand while it is driving.
+</div>
+<div class="box warn">
+<b>Three things that kill boards</b>
+Plus and minus swapped anywhere. The capacitor fitted backwards. A blob of solder joining two pins. Check each with the multimeter before the first power-on (section 7).
+</div>
+<p>These four pins were chosen because they are the usual free pins on an ESP32-CAM when the memory-card slot is not used. So <b>do not put an SD card in</b> the board for this car.</p>
+
+<h2><span>5</span>Day-by-day plan</h2>
+<p>The parts arrive over ten days. This order lets you do something useful each time a parcel lands.</p>
+
+<div class="day"><div class="when">Sat 10 Oct<small>ESP32 board, multimeter</small></div><ul>
+  <li>Install the Arduino IDE on the laptop and add the ESP32 boards package.</li>
+  <li>Plug in the ESP32 dev board and upload the Blink example. This proves the laptop, cable and software all work.</li>
+  <li>Learn two multimeter jobs: DC voltage (measure any battery) and continuity (the beep mode that tells you two points are joined).</li>
+</ul></div>
+
+<div class="day"><div class="when">Sun 11 Oct<small>Chassis, power bank</small></div><ul>
+  <li>Assemble the chassis.</li>
+  <li>Solder two wires to each motor. Do it quickly: the motor tabs are thin and break if bent or overheated.</li>
+  <li>Check the power bank's plug and its output rating (5 V at 2 A or more).</li>
+  <li>Cut the USB cable and confirm 5 V on the red and black wires with the multimeter.</li>
+  <li>Touch those two wires to each motor to see it spin.</li>
+  <li>Buy the capacitor from the market.</li>
+</ul></div>
+
+<div class="day"><div class="when">Fri 16 Oct<small>ESP32-CAM</small></div><ul>
+  <li>Either wait for the programmer base on the 18th, or flash it now through the ESP32 dev board (section 6).</li>
+  <li>Load the camera test program and watch the video on your phone. Getting video first, with no motors, makes later problems easier to find.</li>
+</ul></div>
+
+<div class="day"><div class="when">Sun 18 Oct<small>Programmer base</small></div><ul>
+  <li>Plug the ESP32-CAM into the base. From now on, loading code is just a USB cable.</li>
+  <li>Load the full car program. The video and buttons will work; the wheels will not, because the driver is not here yet.</li>
+</ul></div>
+
+<div class="day"><div class="when">Tue 20 Oct<small>Motor driver</small></div><ul>
+  <li>Solder the header pins onto the driver.</li>
+  <li>Wire everything as in section 4, including the capacitor.</li>
+  <li>Do the first power-on checks (section 7) with the wheels off the ground.</li>
+  <li>Drive.</li>
+</ul></div>
+
+<h2><span>6</span>Software</h2>
+<h3>What the program does</h3>
+<ul>
+  <li>Starts a Wi-Fi hotspot, for example named <code>FPV-Car</code>.</li>
+  <li>Serves one web page at <code>192.168.4.1</code> with the live video and the drive buttons.</li>
+  <li>Stops the motors by itself if the phone disconnects, so the car cannot run away.</li>
+</ul>
+<h3>Arduino IDE settings for the ESP32-CAM</h3>
+<ul>
+  <li>Board: <code>AI Thinker ESP32-CAM</code></li>
+  <li>Port: the one that appears when you plug the board in</li>
+</ul>
+<h3>Flashing before the programmer arrives (optional)</h3>
+<p>The ESP32 dev board can act as a USB adapter for the ESP32-CAM. This is a common trick, but skip it if it feels fiddly and just wait for the 18th.</p>
+<table>
+  <tr><th style="width:40%">ESP32 dev board</th><th>Goes to</th></tr>
+  <tr><td><code>EN</code></td><td>Its own <code>GND</code> (puts the dev board's chip to sleep)</td></tr>
+  <tr><td><code>TX0</code></td><td>ESP32-CAM <code>U0T</code></td></tr>
+  <tr><td><code>RX0</code></td><td>ESP32-CAM <code>U0R</code></td></tr>
+  <tr><td><code>VIN</code> (5 V)</td><td>ESP32-CAM <code>5V</code></td></tr>
+  <tr><td><code>GND</code></td><td>ESP32-CAM <code>GND</code></td></tr>
+</table>
+<p>Then join <code>IO0</code> to <code>GND</code> on the ESP32-CAM, press its reset button, and upload. When the upload finishes, remove the <code>IO0</code> wire and press reset again to run the program.</p>
+<p>The car program itself is not written yet. It is the next job, and it is easier to get right once the real parts are confirmed.</p>
+
+<h2><span>7</span>First power-on checks</h2>
+<p>Do these in order, with the multimeter, <b>before</b> putting the car on the floor.</p>
+<ol>
+  <li><b>Nothing connected to power.</b> In beep mode, check that <code>5V</code> and <code>GND</code> do <i>not</i> keep beeping together. A steady beep means a short. A very short beep that stops is just the capacitor filling up.</li>
+  <li><b>Capacitor.</b> Look again: the striped leg goes to <code>GND</code>.</li>
+  <li><b>Power bank cable alone.</b> It should read about 5 V. Note which wire is plus.</li>
+  <li><b>Lift the car</b> so the wheels are in the air, then plug in the power bank. A short twitch of the wheels at power-on is normal.</li>
+  <li><b>Measure.</b> The ESP32-CAM <code>5V</code> pin and the driver <code>VM</code> pin should both read about 5 V. The <code>3V3</code> pin should read about 3.3 V. The video should work on the phone.</li>
+  <li><b>Press Forward.</b> Both sides should spin forward. If one side goes backward, swap that motor's two wires.</li>
+  <li><b>Press Left and Right.</b> If they are reversed, swap the left and right motor connections on the driver.</li>
+  <li>Put it on the floor and drive.</li>
+</ol>
+
+<h2><span>8</span>Problems and fixes</h2>
+<table>
+  <tr><th style="width:38%">What you see</th><th>Likely cause and fix</th></tr>
+  <tr><td>Video freezes or the board restarts when the car starts moving</td><td>Power dip. Check the capacitor is fitted and the power wires are short and firmly joined. If it keeps happening, give the motors their own AA pack (section 3).</td></tr>
+  <tr><td>Video works but the wheels do nothing</td><td>Check the ground wire to the driver. Check <code>STBY</code>, <code>PWMA</code> and <code>PWMB</code> are at 3.3 V. Check <code>VM</code> reads about 5 V.</td></tr>
+  <tr><td>Only one side works</td><td>A loose signal wire or a cold solder joint on that side of the driver.</td></tr>
+  <tr><td>Car is slow or stops after a few minutes</td><td>Power bank is low or too weak. Measure <code>VM</code> while the motors run: if it drops well below 4.5 V, charge the power bank or try a stronger one.</td></tr>
+  <tr><td>Code will not upload</td><td><code>IO0</code> must be joined to <code>GND</code> during upload (the programmer base does this for you). Try pressing reset just as the upload starts. Try another USB cable: many are charge-only.</td></tr>
+  <tr><td>Camera error in the serial log</td><td>The camera's ribbon cable is not fully seated. Lift the black latch, push the ribbon in straight, and close the latch.</td></tr>
+  <tr><td>Power bank switches itself off</td><td>Some power banks cut out when the load is small. Leaving the video streaming usually keeps it awake.</td></tr>
+  <tr><td>Phone drops off the car's Wi-Fi</td><td>The phone leaves hotspots that have no internet. Turn off mobile data or choose "stay connected" when asked.</td></tr>
+</table>
+
+<h2><span>9</span>What to expect, and later upgrades</h2>
+<ul>
+  <li><b>Video:</b> small and a bit laggy compared with real FPV goggles. Fine for driving around a room slowly; not for racing.</li>
+  <li><b>Range:</b> roughly one or two rooms. The ESP32-CAM's built-in antenna is small.</li>
+  <li><b>Speed:</b> walking pace. TT motors are slow but have enough pull for a light car.</li>
+</ul>
+<p>Good next steps once it drives:</p>
+<ul>
+  <li>Speed slider on the web page.</li>
+  <li>Headlight using the ESP32-CAM's built-in flash LED.</li>
+  <li>External antenna for more range.</li>
+  <li>A separate battery pack for the motors, for more speed and steadier video.</li>
+  <li>Use the spare ESP32 dev board for sensors, for example a distance sensor that stops the car before it hits a wall.</li>
+</ul>
+
+</body>
+</html>

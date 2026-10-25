@@ -1,0 +1,9 @@
+# Android build output and machine-specific paths
+rc-pilot/.gradle/
+rc-pilot/.kotlin/
+rc-pilot/build/
+rc-pilot/app/build/
+rc-pilot/local.properties
+*.apk
+.DS_Store
+.idea/
