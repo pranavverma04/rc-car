@@ -71,14 +71,28 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontStyle
+import kotlin.math.cos
+import kotlin.math.sin
 
-private val Bg = Color(0xFF0B0F14)
-private val Panel = Color(0xFF141B24)
-private val Line = Color(0xFF243041)
-private val Amber = Color(0xFFF5A524)
-private val Green = Color(0xFF34D399)
-private val Red = Color(0xFFF87171)
-private val Muted = Color(0xFF8A97A8)
+// Matte transmitter body, cream lettering, one hobby-orange accent
+private val Body = Color(0xFF1B1A18)
+private val Plate = Color(0xFF252320)
+private val Groove = Color(0xFF34312C)
+private val Edge = Color(0xFF0F0E0D)
+private val Ink = Color(0xFFEDE6D6)
+private val Dim = Color(0xFF8E877B)
+private val Signal = Color(0xFFFF6A1F)
+private val LedOn = Color(0xFF8BE05A)
+private val LedOff = Color(0xFF5A2A22)
+private val Tape = Color(0xFF111111)
 
 enum class Mode(val label: String) { STICKS("2 sticks"), ONE("1 stick"), TILT("Tilt") }
 
@@ -108,7 +122,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val prefs = getSharedPreferences("rc", Context.MODE_PRIVATE)
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(primary = Amber, background = Bg, surface = Panel)) {
+            MaterialTheme(colorScheme = darkColorScheme(primary = Signal, background = Body, surface = Plate, onSurface = Ink)) {
                 Cockpit(
                     link = link,
                     prefs = prefs,
@@ -117,6 +131,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 )
             }
         }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.systemBars())
     }
 
     override fun onStart() {
@@ -203,42 +222,39 @@ private fun Cockpit(link: CarLink, prefs: android.content.SharedPreferences, til
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Bg)) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 10.dp)) {
-            TopBar(status, mode, light, onMode = { if (it == Mode.TILT && mode == Mode.TILT) neutral = tiltRaw() else mode = it }, onLight = { light = !light; link.light(light) },
-                onSettings = { showSettings = true })
+    Box(Modifier.fillMaxSize().background(Body)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 12.dp)) {
+            TopBar(status, mode, light, onMode = { if (it == Mode.TILT && mode == Mode.TILT) neutral = tiltRaw() else mode = it },
+                onLight = { light = !light; link.light(light) }, onSettings = { showSettings = true }, openWifi = openWifi)
             Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                // Left side
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     when (mode) {
-                        Mode.STICKS -> StickWithLabel("THROTTLE") {
-                            Joystick(Axis.Y, Amber, !parked, Modifier.size(210.dp)) { _, y -> throttle = y }
+                        Mode.STICKS -> Labelled("THROTTLE", -2f) {
+                            Joystick(Axis.Y, Signal, !parked, Modifier.size(200.dp)) { _, y -> throttle = y }
                         }
-                        Mode.ONE -> Hint("One-stick mode\nRight stick drives and steers")
-                        Mode.TILT -> Pedal("REVERSE", Red, !parked) { reverse = it }
+                        Mode.ONE -> Text("left thumb's free.\nright stick does both.", color = Dim, fontSize = 14.sp,
+                            fontStyle = FontStyle.Italic, fontFamily = FontFamily.Serif, lineHeight = 20.sp)
+                        Mode.TILT -> Labelled("REVERSE", 1.5f) { Pedal(!parked) { reverse = it } }
                     }
                 }
-                CenterPanel(out, limit, parked, boost, status.connected,
-                    onLimit = { limit = it }, onPark = { parked = !parked }, onBoost = { boost = it })
-                // Right side
+                CenterPanel(out, limit, parked, boost, onLimit = { limit = it }, onPark = { parked = !parked }, onBoost = { boost = it })
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     when (mode) {
-                        Mode.STICKS -> StickWithLabel("STEER") {
-                            Joystick(Axis.X, Amber, !parked, Modifier.size(210.dp)) { x, _ -> steer = x }
+                        Mode.STICKS -> Labelled("STEER", 2f) {
+                            Joystick(Axis.X, Signal, !parked, Modifier.size(200.dp)) { x, _ -> steer = x }
                         }
-                        Mode.ONE -> StickWithLabel("DRIVE") {
-                            Joystick(Axis.BOTH, Amber, !parked, Modifier.size(230.dp)) { x, y -> steer = x; throttle = y }
+                        Mode.ONE -> Labelled("DRIVE", 1.5f) {
+                            Joystick(Axis.BOTH, Signal, !parked, Modifier.size(220.dp)) { x, y -> steer = x; throttle = y }
                         }
-                        Mode.TILT -> Pedal("GAS", Green, !parked) { gas = it }
+                        Mode.TILT -> Labelled("GAS", -1.5f) { Pedal(!parked) { gas = it } }
                     }
                 }
             }
             if (mode == Mode.TILT) {
-                Text("Tilt the phone like a steering wheel. Tap Tilt again to reset straight.",
-                    color = Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text("tilt like a wheel · tap tilt again to re-centre", color = Dim, fontSize = 12.sp,
+                    fontStyle = FontStyle.Italic, fontFamily = FontFamily.Serif, modifier = Modifier.align(Alignment.CenterHorizontally))
             }
         }
-        if (!status.connected) NotConnected(Modifier.align(Alignment.TopCenter).padding(top = 64.dp), openWifi)
     }
 
     if (showSettings) {
@@ -248,33 +264,39 @@ private fun Cockpit(link: CarLink, prefs: android.content.SharedPreferences, til
 }
 
 @Composable
-private fun TopBar(status: CarLink.Status, mode: Mode, light: Boolean, onMode: (Mode) -> Unit, onLight: () -> Unit, onSettings: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(if (status.connected) Green else Red))
+private fun TopBar(status: CarLink.Status, mode: Mode, light: Boolean, onMode: (Mode) -> Unit, onLight: () -> Unit,
+                   onSettings: () -> Unit, openWifi: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("rc pilot", color = Ink, fontSize = 20.sp, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(18.dp))
+        Led(status.connected)
         Spacer(Modifier.width(8.dp))
-        Text(if (status.connected) "CONNECTED" else "SEARCHING", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        Spacer(Modifier.width(14.dp))
-        Text(if (status.connected) "${status.pingMs} ms" else "-- ms", color = pingColor(status), fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-        Spacer(Modifier.width(14.dp))
-        SignalBars(status.rssi)
-        if (status.rssi != 0) Text(" ${status.rssi} dBm", color = Muted, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-        Spacer(Modifier.weight(1f))
-        Mode.entries.forEach { m ->
-            Chip(m.label, m == mode) { onMode(m) }
-            Spacer(Modifier.width(6.dp))
+        if (status.connected) {
+            Text("on air · ${status.pingMs} ms", color = Ink, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.width(10.dp))
+            SignalBars(status.rssi)
+        } else {
+            Text("no car. join wifi RC-Car / drive1234", color = Dim, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.width(10.dp))
+            Key("wifi", onClick = openWifi)
         }
-        Spacer(Modifier.width(10.dp))
-        Chip(if (light) "LIGHT ON" else "LIGHT", light, onLight)
-        Spacer(Modifier.width(6.dp))
-        Chip("SETTINGS", false, onSettings)
+        Spacer(Modifier.weight(1f))
+        ModeSwitch(mode, onMode)
+        Spacer(Modifier.width(14.dp))
+        Key("light", lit = light, onClick = onLight)
+        Spacer(Modifier.width(8.dp))
+        Key("setup", onClick = onSettings)
     }
 }
 
-private fun pingColor(s: CarLink.Status) = when {
-    !s.connected -> Muted
-    s.pingMs < 40 -> Green
-    s.pingMs < 100 -> Amber
-    else -> Red
+/** Little panel LED with a soft glow when it's on. */
+@Composable
+private fun Led(on: Boolean) {
+    Canvas(Modifier.size(12.dp)) {
+        if (on) drawCircle(LedOn.copy(alpha = 0.25f), size.minDimension)
+        drawCircle(if (on) LedOn else LedOff, size.minDimension / 2f)
+        drawCircle(Color.White.copy(alpha = if (on) 0.5f else 0.12f), size.minDimension / 6f, center + Offset(-2f, -2f))
+    }
 }
 
 @Composable
@@ -287,146 +309,177 @@ private fun SignalBars(rssi: Int) {
         else -> 1
     }
     Row(verticalAlignment = Alignment.Bottom) {
-        for (i in 1..4) {
-            Box(Modifier.padding(end = 2.dp).width(4.dp).height((4 + i * 3).dp)
-                .background(if (i <= bars) Green else Line, RoundedCornerShape(1.dp)))
+        for (i in 1..4) Box(Modifier.padding(end = 2.dp).width(3.dp).height((3 + i * 3).dp).background(if (i <= bars) Ink else Groove))
+    }
+}
+
+/** Physical-looking key: flat top, darker lip underneath that disappears when pressed in. */
+@Composable
+private fun Key(text: String, lit: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier.drawBehind { drawRoundRect(Edge, topLeft = Offset(0f, 3.dp.toPx()), size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx())) }
+            .clip(RoundedCornerShape(5.dp)).background(if (lit) Ink else Plate)
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp)
+    ) {
+        Text(text, color = if (lit) Body else Ink, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+    }
+}
+
+/** Three-position slide switch, like the ones on a real transmitter. */
+@Composable
+private fun ModeSwitch(mode: Mode, onMode: (Mode) -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(6.dp)).background(Edge).padding(3.dp)) {
+        Mode.entries.forEach { m ->
+            val on = m == mode
+            Box(
+                Modifier.clip(RoundedCornerShape(4.dp)).background(if (on) Plate else Color.Transparent)
+                    .clickable { onMode(m) }.padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(m.label.lowercase(), color = if (on) Ink else Dim, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            }
+        }
+    }
+}
+
+/** Embossed label-maker strip, stuck on slightly crooked. */
+@Composable
+private fun DymoLabel(text: String, tilt: Float) {
+    Box(Modifier.rotate(tilt).clip(RoundedCornerShape(2.dp)).background(Tape).padding(horizontal = 8.dp, vertical = 3.dp)) {
+        Text(text, color = Color(0xFFF2F2F2), fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+    }
+}
+
+@Composable
+private fun Labelled(label: String, tilt: Float, content: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        content()
+        Spacer(Modifier.height(10.dp))
+        DymoLabel(label, tilt)
+    }
+}
+
+/** Foot pedal: ridged rubber plate that sinks a little while held. */
+@Composable
+private fun Pedal(enabled: Boolean, onPress: (Boolean) -> Unit) {
+    var down by remember { mutableStateOf(false) }
+    Canvas(
+        Modifier.size(width = 140.dp, height = 190.dp).pointerInput(enabled) {
+            if (!enabled) return@pointerInput
+            awaitEachGesture {
+                awaitFirstDown()
+                down = true; onPress(true)
+                waitForUpOrCancellation()
+                down = false; onPress(false)
+            }
+        }
+    ) {
+        val lip = 6.dp.toPx()
+        val r = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx())
+        val sink = if (down) lip else 0f
+        drawRoundRect(Edge, Offset(0f, lip), Size(size.width, size.height - lip), r)
+        drawRoundRect(if (down) Groove else Plate, Offset(0f, sink), Size(size.width, size.height - lip), r)
+        val a = if (enabled) 1f else 0.4f
+        var y = sink + 22.dp.toPx()
+        while (y < size.height - lip - 18.dp.toPx()) {
+            drawLine(Edge.copy(alpha = a), Offset(16.dp.toPx(), y), Offset(size.width - 16.dp.toPx(), y), 4.dp.toPx(), StrokeCap.Round)
+            y += 14.dp.toPx()
         }
     }
 }
 
 @Composable
-private fun Chip(text: String, on: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.clip(RoundedCornerShape(50)).background(if (on) Amber else Panel)
-            .border(1.dp, if (on) Amber else Line, RoundedCornerShape(50))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp)
-    ) {
-        Text(text, color = if (on) Color.Black else Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun StickWithLabel(label: String, content: @Composable () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        content()
-        Text(label, color = Muted, fontSize = 11.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun Hint(text: String) {
-    Text(text, color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
-}
-
-@Composable
-private fun Pedal(label: String, color: Color, enabled: Boolean, onPress: (Boolean) -> Unit) {
-    var down by remember { mutableStateOf(false) }
-    Box(
-        Modifier.size(width = 150.dp, height = 190.dp).clip(RoundedCornerShape(22.dp))
-            .background(if (down) color else color.copy(alpha = if (enabled) 0.18f else 0.06f))
-            .border(2.dp, color.copy(alpha = if (enabled) 0.8f else 0.2f), RoundedCornerShape(22.dp))
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                awaitEachGesture {
-                    awaitFirstDown()
-                    down = true; onPress(true)
-                    waitForUpOrCancellation()
-                    down = false; onPress(false)
-                }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = if (down) Color.Black else Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 2.sp)
-    }
-}
-
-@Composable
-private fun CenterPanel(out: Pair<Int, Int>, limit: Int, parked: Boolean, boost: Boolean, connected: Boolean,
+private fun CenterPanel(out: Pair<Int, Int>, limit: Int, parked: Boolean, boost: Boolean,
                         onLimit: (Int) -> Unit, onPark: () -> Unit, onBoost: (Boolean) -> Unit) {
     Column(
-        Modifier.width(250.dp).fillMaxHeight().padding(vertical = 8.dp).clip(RoundedCornerShape(20.dp))
-            .background(Panel).border(1.dp, Line, RoundedCornerShape(20.dp)).padding(14.dp),
+        Modifier.width(260.dp).fillMaxHeight().padding(vertical = 10.dp).clip(RoundedCornerShape(10.dp))
+            .background(Plate).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Live motor power, left and right
-        Row(Modifier.fillMaxWidth().height(110.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            MotorBar("L", out.first)
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.CenterVertically)) {
-                val avg = (abs(out.first) + abs(out.second)) / 2
-                Text("$avg", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
-                Text("% POWER", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp)
-            }
-            MotorBar("R", out.second)
-        }
-        // Speed limit
+        Gauge((abs(out.first) + abs(out.second)) / 2, out)
         Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth()) {
-                Text("MAX SPEED", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Text("top speed", color = Dim, fontSize = 12.sp, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic)
                 Spacer(Modifier.weight(1f))
-                Text("$limit%", color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text("$limit", color = Ink, fontSize = 15.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
             Slider(value = limit.toFloat(), onValueChange = { onLimit(it.toInt()) }, valueRange = 30f..100f, steps = 13,
-                colors = SliderDefaults.colors(thumbColor = Amber, activeTrackColor = Amber, inactiveTrackColor = Line))
+                colors = SliderDefaults.colors(thumbColor = Ink, activeTrackColor = Signal, inactiveTrackColor = Groove,
+                    activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Hold for full power
-            Box(
-                Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp))
-                    .background(if (boost) Amber else Bg).border(1.dp, Amber, RoundedCornerShape(14.dp))
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            awaitFirstDown(); onBoost(true)
-                            waitForUpOrCancellation(); onBoost(false)
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) { Text("BOOST", color = if (boost) Color.Black else Amber, fontWeight = FontWeight.Black) }
-            Box(
-                Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp))
-                    .background(if (parked) Red else Bg).border(1.dp, Red, RoundedCornerShape(14.dp))
-                    .clickable(onClick = onPark),
-                contentAlignment = Alignment.Center
-            ) { Text(if (parked) "PARKED" else "PARK", color = if (parked) Color.Black else Red, fontWeight = FontWeight.Black) }
+            BigKey("boost", "hold", boost, Signal, Modifier.weight(1f).pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(); onBoost(true)
+                    waitForUpOrCancellation(); onBoost(false)
+                }
+            })
+            BigKey(if (parked) "parked" else "park", if (parked) "tap to drive" else "lock wheels", parked, Ink,
+                Modifier.weight(1f).clickable(onClick = onPark))
         }
-        if (!connected) Text("Wheels stop by themselves\nwhen the link drops", color = Muted, fontSize = 10.sp, lineHeight = 13.sp)
     }
 }
 
 @Composable
-private fun MotorBar(label: String, power: Int) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxHeight()) {
-        Box(Modifier.width(18.dp).weight(1f).clip(RoundedCornerShape(6.dp)).background(Bg)) {
-            // Fills up from the middle line for forward, down for reverse
-            val frac = abs(power) / 100f
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Line).align(Alignment.Center))
-            when {
-                power > 0 -> Column(Modifier.fillMaxSize()) {
-                    Spacer(Modifier.weight(1f - 0.5f * frac + 0.0001f))
-                    Box(Modifier.fillMaxWidth().weight(0.5f * frac + 0.0001f).background(Green))
-                    Spacer(Modifier.weight(0.5f))
-                }
-                power < 0 -> Column(Modifier.fillMaxSize()) {
-                    Spacer(Modifier.weight(0.5f))
-                    Box(Modifier.fillMaxWidth().weight(0.5f * frac + 0.0001f).background(Red))
-                    Spacer(Modifier.weight(1f - 0.5f * frac + 0.0001f))
-                }
-            }
-        }
-        Text(label, color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun NotConnected(modifier: Modifier, openWifi: () -> Unit) {
-    Row(
-        modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF2A1416)).border(1.dp, Red, RoundedCornerShape(14.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun BigKey(text: String, sub: String, down: Boolean, color: Color, modifier: Modifier) {
+    Box(
+        modifier.height(56.dp)
+            .drawBehind { drawRoundRect(Edge, topLeft = Offset(0f, 4.dp.toPx()), size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())) }
+            .offset(y = if (down) 3.dp else 0.dp)
+            .clip(RoundedCornerShape(8.dp)).background(if (down) color else Groove),
+        contentAlignment = Alignment.Center
     ) {
-        Text("Join Wi-Fi  RC-Car  (password drive1234)", color = Color.White, fontSize = 13.sp)
-        Spacer(Modifier.width(14.dp))
-        Chip("OPEN WI-FI", true, openWifi)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text, color = if (down) Body else color, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            Text(sub, color = if (down) Body.copy(alpha = 0.7f) else Dim, fontSize = 10.sp, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic)
+        }
+    }
+}
+
+/** Old-school needle gauge for average motor power, with the two wheels as small ticks underneath. */
+@Composable
+private fun Gauge(power: Int, out: Pair<Int, Int>) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Canvas(Modifier.width(180.dp).height(96.dp)) {
+            val c = Offset(size.width / 2f, size.height - 6.dp.toPx())
+            val r = size.width / 2f - 6.dp.toPx()
+            for (i in 0..20) {
+                val a = Math.PI * (1 - i / 20.0)
+                val long = i % 5 == 0
+                val r0 = r - (if (long) 14.dp else 7.dp).toPx()
+                val col = if (i >= 16) Signal else Ink.copy(alpha = if (long) 0.9f else 0.45f)
+                drawLine(col, c + Offset((r0 * cos(a)).toFloat(), (-r0 * sin(a)).toFloat()),
+                    c + Offset((r * cos(a)).toFloat(), (-r * sin(a)).toFloat()), (if (long) 2.5f else 1.5f).dp.toPx())
+            }
+            val a = Math.PI * (1 - power.coerceIn(0, 100) / 100.0)
+            val n = r - 18.dp.toPx()
+            drawLine(Signal, c, c + Offset((n * cos(a)).toFloat(), (-n * sin(a)).toFloat()), 2.5f.dp.toPx(), StrokeCap.Round)
+            drawCircle(Ink, 5.dp.toPx(), c)
+            drawCircle(Body, 2.dp.toPx(), c)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WheelTick("L", out.first)
+            Spacer(Modifier.width(18.dp))
+            Text("$power%", color = Ink, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.width(18.dp))
+            WheelTick("R", out.second)
+        }
+    }
+}
+
+/** One wheel: a short bar that grows right for forward, left for reverse. */
+@Composable
+private fun WheelTick(label: String, power: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Dim, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Spacer(Modifier.width(4.dp))
+        Canvas(Modifier.width(36.dp).height(6.dp)) {
+            drawRect(Groove)
+            val mid = size.width / 2f
+            val w = mid * abs(power) / 100f
+            drawRect(if (power >= 0) Ink else Signal, Offset(if (power >= 0) mid else mid - w, 0f), Size(w, size.height))
+            drawRect(Body, Offset(mid - 0.5.dp.toPx(), 0f), Size(1.dp.toPx(), size.height))
+        }
     }
 }
 
@@ -435,23 +488,25 @@ private fun SettingsDialog(host: String, trim: Float, invert: Boolean, onHost: (
                            onInvert: (Boolean) -> Unit, onClose: () -> Unit) {
     AlertDialog(
         onDismissRequest = onClose,
-        confirmButton = { TextButton(onClick = onClose) { Text("DONE") } },
-        title = { Text("Settings") },
+        containerColor = Plate,
+        shape = RoundedCornerShape(10.dp),
+        confirmButton = { TextButton(onClick = onClose) { Text("done", color = Signal, fontFamily = FontFamily.Monospace) } },
+        title = { Text("setup", color = Ink, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Trim: if the car pulls to one side while driving straight, slide towards the other side.",
-                    fontSize = 12.sp, color = Muted)
+                Text("Car drifts on a straight line? Push trim the other way.", fontSize = 13.sp, color = Dim)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Pulls right", fontSize = 11.sp, color = Muted)
-                    Slider(value = trim, onValueChange = onTrim, valueRange = -0.25f..0.25f, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-                    Text("Pulls left", fontSize = 11.sp, color = Muted)
+                    Text("pulls right", fontSize = 11.sp, color = Dim, fontFamily = FontFamily.Monospace)
+                    Slider(value = trim, onValueChange = onTrim, valueRange = -0.25f..0.25f, modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        colors = SliderDefaults.colors(thumbColor = Ink, activeTrackColor = Signal, inactiveTrackColor = Groove))
+                    Text("pulls left", fontSize = 11.sp, color = Dim, fontFamily = FontFamily.Monospace)
                 }
-                Text("Trim ${"%+d".format((trim * 100).toInt())}%", fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text("trim ${"%+d".format((trim * 100).toInt())}", fontSize = 12.sp, color = Ink, fontFamily = FontFamily.Monospace)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Flip steering (if left turns right)", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                    Text("flip steering (left turns right?)", modifier = Modifier.weight(1f), fontSize = 13.sp, color = Ink)
                     Switch(checked = invert, onCheckedChange = onInvert)
                 }
-                OutlinedTextField(value = host, onValueChange = onHost, label = { Text("Car address") }, singleLine = true)
+                OutlinedTextField(value = host, onValueChange = onHost, label = { Text("car address") }, singleLine = true)
             }
         }
     )

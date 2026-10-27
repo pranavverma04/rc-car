@@ -36,10 +36,10 @@ void setup() {
 }
 
 void loop() {
-  step("LEFT  forward  (A01 +)", PWMA, AIN1, AIN2, 1);
-  step("LEFT  backward (A01 -)", PWMA, AIN1, AIN2, -1);
-  step("RIGHT forward  (B01 +)", PWMB, BIN1, BIN2, 1);
-  step("RIGHT backward (B01 -)", PWMB, BIN1, BIN2, -1);
+  step("LEFT  forward  (B01 +)", PWMB, BIN1, BIN2, 1);    // left motor is on B01/B02
+  step("LEFT  backward (B01 -)", PWMB, BIN1, BIN2, -1);
+  step("RIGHT forward  (A01 +)", PWMA, AIN1, AIN2, 1);
+  step("RIGHT backward (A01 -)", PWMA, AIN1, AIN2, -1);
   Serial.println("--- repeat in 3 s ---");
   delay(3000);
 }
