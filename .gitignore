@@ -10,3 +10,10 @@ rc-pilot/local.properties
 
 # Arduino build output
 */build/
+
+# Other app variants
+rc-pilot-*/.gradle/
+rc-pilot-*/.kotlin/
+rc-pilot-*/build/
+rc-pilot-*/app/build/
+rc-pilot-*/local.properties

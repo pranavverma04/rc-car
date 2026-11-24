@@ -57,6 +57,7 @@ The wheels stop by themselves 400 ms after the phone stops sending.
 |---|---|
 | `rc_car/` | Car firmware: web page, HTTP drive, UDP drive on port 4210 for the app |
 | `rc-pilot/` | Android app (Kotlin, Jetpack Compose): 2-stick / 1-stick / tilt modes, ping, signal, boost, park, trim |
+| `rc-pilot-dash/` | Same app with a first-person cabin: drawn road view, wheel, P R N D lever, gas + brake pedals, power and signal gauges |
 | `wire_test/` | Runs each wheel forward and back, for a bench check |
 | `sonar_check/` | HC-SR04 pin check on the ESP32 DevKit (D25/D26, tries both pin orders) |
 | `cam_sonar_check/` | HC-SR04 check on the ESP32-CAM (GPIO13/14) |

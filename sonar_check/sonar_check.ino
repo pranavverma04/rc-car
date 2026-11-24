@@ -1,6 +1,6 @@
-// HC-SR04 wiring check. Serial 115200. Expected: TRIG D25, ECHO D26 (through a divider, or direct).
+// HC-SR04 wiring check. Serial 115200. Expected: TRIG D23, ECHO D22 (through a divider, or direct).
 // Prints every 700 ms: is the ECHO wire connected or floating, raw echo time normal and with TRIG/ECHO swapped.
-const int A = 25, B = 26;
+const int A = 23, B = 22;
 
 uint32_t ping(int trig, int echo) {
   pinMode(trig, OUTPUT); pinMode(echo, INPUT);
@@ -26,8 +26,8 @@ void setup() {
 }
 
 void loop() {
-  Serial.printf("D26: %-32s  D25: %-32s  ", wire(B), wire(A));
-  uint32_t n = ping(A, B);     // normal: TRIG 25, ECHO 26
+  Serial.printf("D22: %-32s  D23: %-32s  ", wire(B), wire(A));
+  uint32_t n = ping(A, B);     // normal: TRIG 23, ECHO 22
   delay(60);
   uint32_t s = ping(B, A);     // swapped
   Serial.printf("echo normal %5lu us (%3ld cm)   swapped %5lu us (%3ld cm)\n", n, n / 58, s, s / 58);

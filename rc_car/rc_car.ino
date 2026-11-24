@@ -29,8 +29,8 @@ const int STBY = 4;                          // LOW = driver off, so the motors 
 const int LED = 2;                           // blue LED on the DevKit
 
 // ---- Sonar pins (HC-SR04) ----
-// ECHO is a 5 V signal: go through 1k (sensor side) + 2k (to GND), tap the middle for GPIO26.
-const int TRIG = 25, ECHO = 26;
+// ECHO is a 5 V signal: go through 1k or 330 (sensor side) + 2k or 2x330 (to GND), tap the middle for GPIO22.
+const int TRIG = 23, ECHO = 22;
 
 const uint32_t PWM_HZ = 20000;   // above hearing, no motor whine
 const uint8_t PWM_BITS = 8;      // duty 0..255
@@ -38,19 +38,21 @@ const uint8_t PWM_BITS = 8;      // duty 0..255
 // ---- Safety ----
 const uint32_t FAILSAFE_MS = 400;       // manual: stop if no drive command for this long
 const uint32_t AUTO_LINK_MS = 1200;     // auto: drop out of auto if the phone has gone quiet this long
-const int GUARD_CM = 15;                // manual: forward is blocked closer than this (reverse and spin still work)
+const int GUARD_CM = 25;                // manual: forward is blocked (with a hard brake) closer than this; reverse and spin still work
+const int SLOW_CM = 70;                 // manual: forward power fades from full here down to MIN_FWD at GUARD_CM
+const int MIN_FWD = 35;                 // TT motors stall below ~30%
 
 // ---- Auto-pilot ----
 const int AVOID_CM = 30;                // start avoiding
 const int CLEAR_CM = 45;                // path counts as clear again
-const int AUTO_SPEED = 55;              // cruise power %
-const int TURN_SPEED = 60;              // spin power %
+const int AUTO_SPEED = 85;              // cruise power %; 55 would not start the TT motors on AA cells
+const int TURN_SPEED = 90;              // spin power %; spinning needs more torque than rolling
 const uint32_t BACK_MS = 350;
 const uint32_t TURN_MS = 450;
 const uint32_t STUCK_WINDOW_MS = 2500;  // two avoids this close together = a corner: turn longer
 
 // ---- Sonar timing ----
-const uint32_t SONAR_PERIOD_MS = 60;
+const uint32_t SONAR_PERIOD_MS = 40;   // faster pings = earlier stop; 25 ms echo timeout still fits
 const uint32_t ECHO_TIMEOUT_US = 25000; // ~4.3 m round trip
 const int SONAR_MAX_CM = 400;
 
@@ -69,16 +71,20 @@ volatile uint32_t lastSeenMs = 0;           // last sign of life of any kind (/s
 volatile int speedPct = 80;                 // web page speed; TT motors stall below ~30%
 
 // ---------- Motors (driveTask only) ----------
-void side(int pwm, int in1, int in2, int val) {   // val -100..100, sign = direction
+void side(int pwm, int in1, int in2, int val, bool brake) {   // val -100..100, sign = direction
+  if (val == 0 && brake) {                        // IN1 = IN2 = HIGH: TB6612 short brake, stops in a few cm instead of coasting
+    digitalWrite(in1, HIGH); digitalWrite(in2, HIGH); ledcWrite(pwm, 255);
+    return;
+  }
   digitalWrite(in1, val > 0 ? HIGH : LOW);
   digitalWrite(in2, val < 0 ? HIGH : LOW);
   ledcWrite(pwm, abs(val) * 255 / 100);
 }
-void setMotors(int l, int r) {
+void setMotors(int l, int r, bool brake = false) {
   l = constrain(l, -100, 100);
   r = constrain(r, -100, 100);
-  side(PWMB, BIN1, BIN2, l);   // left motor is on B01/B02
-  side(PWMA, AIN1, AIN2, r);
+  side(PWMB, BIN1, BIN2, l, brake);   // left motor is on B01/B02
+  side(PWMA, AIN1, AIN2, r, brake);
   outL = l; outR = r;
 }
 
@@ -97,6 +103,8 @@ int pingCm() {
 void sonarTask(void *) {
   int ring[3] = {-1, -1, -1};
   int i = 0;
+  int lastClose = -1;
+  uint32_t lastCloseMs = 0;
   for (;;) {
     ring[i] = pingCm();
     i = (i + 1) % 3;
@@ -105,7 +113,12 @@ void sonarTask(void *) {
     int b = ring[1] < 0 ? SONAR_MAX_CM : ring[1];
     int c = ring[2] < 0 ? SONAR_MAX_CM : ring[2];
     int m = max(min(a, b), min(max(a, b), c));
-    rangeCm = m >= SONAR_MAX_CM ? -1 : m;
+    int now = m >= SONAR_MAX_CM ? -1 : m;
+    // Right up against something the HC-SR04 often gives no echo at all. If the last real reading was close,
+    // hold it for a moment instead of reporting "clear", so the guard does not let go at the worst time.
+    if (now < 0 && lastClose >= 0 && millis() - lastCloseMs < 600) now = lastClose;
+    if (now >= 0 && now < SLOW_CM) { lastClose = now; lastCloseMs = millis(); }
+    rangeCm = now;
     vTaskDelay(pdMS_TO_TICKS(SONAR_PERIOD_MS));
   }
 }
@@ -121,6 +134,7 @@ void driveTask(void *) {
     uint32_t now = millis();
     int d = rangeCm;
     int l = 0, r = 0;
+    bool brake = false;
     bool near = d >= 0 && d < AVOID_CM;
 
     if (autoWanted && now - lastSeenMs > AUTO_LINK_MS) {
@@ -158,13 +172,19 @@ void driveTask(void *) {
       bool linkOk = now - lastCmdMs < FAILSAFE_MS;
       l = linkOk ? wantL : 0;
       r = linkOk ? wantR : 0;
-      // Bumper guard: no driving forward into something, but reverse and spinning still work so you can get out
-      bool forward = l > 0 && r > 0;
+      // Bumper guard: any forward motion (straight or curving) slows near a wall and is braked at GUARD_CM.
+      // Reverse and spinning on the spot still work so you can get out.
+      bool forward = l + r > 0;
       blocked = forward && d >= 0 && d < GUARD_CM;
-      if (blocked) l = r = 0;
+      if (blocked) { l = r = 0; brake = true; }
+      else if (forward && d >= 0 && d < SLOW_CM) {
+        int cap = map(d, GUARD_CM, SLOW_CM, MIN_FWD, 100);   // allowed power at this distance
+        int top = max(abs(l), abs(r));
+        if (top > cap) { l = l * cap / top; r = r * cap / top; }   // scale both sides: keeps the steering
+      }
     }
 
-    setMotors(l, r);
+    setMotors(l, r, brake);
     vTaskDelayUntil(&wake, pdMS_TO_TICKS(20));
   }
 }
