@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- wheels -->
+    <path android:fillColor="#2A3442" android:pathData="M33,38h8v14h-8z M67,38h8v14h-8z M33,58h8v14h-8z M67,58h8v14h-8z" />
+    <!-- body -->
+    <path android:fillColor="#F5A524" android:pathData="M44,32h20a5,5 0 0 1 5,5v38a5,5 0 0 1 -5,5h-20a5,5 0 0 1 -5,-5v-38a5,5 0 0 1 5,-5z" />
+    <!-- windscreen -->
+    <path android:fillColor="#0B0F14" android:pathData="M45,42h18v8h-18z" />
+    <!-- signal arcs -->
+    <path android:strokeColor="#34D399" android:strokeWidth="3" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M46,25a11,11 0 0 1 16,0 M42,20a17,17 0 0 1 24,0" />
+</vector>
