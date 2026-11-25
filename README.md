@@ -64,7 +64,7 @@ The wheels stop by themselves 400 ms after the phone stops sending.
 | `uno_sonar_check/` | HC-SR04 check on an Arduino UNO (D9/D10, 5 V so no divider) |
 | `conn_check/`, `live_check/`, `esp_check/` | Wiring checks over serial (115200) |
 | `fpv_car/`, `cam_test/` | Older ESP32-CAM version with video (not used now) |
-| `guide.html`, `assembly/`, PDFs | Build guide and chassis assembly steps |
+| `guide.html`, PDF | Build guide |
 
 ## Build
 
