@@ -17,3 +17,8 @@ rc-pilot-*/.kotlin/
 rc-pilot-*/build/
 rc-pilot-*/app/build/
 rc-pilot-*/local.properties
+
+# third-party reference frames, kept local only
+assembly/
+assembly.html
+Chassis Assembly Steps.pdf
